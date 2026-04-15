@@ -1,0 +1,48 @@
+# === SFT ===
+sft:
+  data_path: "data/pet_sft_train.jsonl"
+  compliance_val_path: "data/compliance_val.jsonl"
+  compliance_val_size: 50
+  compliance_check_steps: 500
+  compliance_sample_size: 20
+  label_smoothing_factor: 0.1
+
+# === KL Distillation ===
+kl_distillation:
+  enabled: false
+  lambda_kl: 0.1
+  temperature: 2.0
+  top_k_approx: true
+  top_k: 20
+  provider: "file"
+  logits_dir: "data/teacher_logits/"
+  api:
+    base_url: ""
+    model_name: ""
+    key_env: ""
+    max_concurrent: 10
+    timeout: 60
+    max_retries: 3
+
+# === DPO ===
+dpo:
+  min_pairs: 500
+  pref_beta: 0.1
+  sft_adapter_path: ""
+  data_path: "data/pet_dpo_pairs.jsonl"
+  learning_rate: 5.0e-5
+
+# === Audio ===
+audio:
+  sample_rate: 16000
+  n_mels: 64
+  data_dir: "data/audio/"
+  classes: ["eating", "drinking", "vomiting", "ambient", "other"]
+  train_split: 0.8
+  val_split: 0.1
+  test_split: 0.1
+
+# === Common ===
+wandb:
+  project: "pet-train"
+  entity: ""
