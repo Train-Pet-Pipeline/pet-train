@@ -36,6 +36,10 @@ dpo:
 audio:
   sample_rate: 16000
   n_mels: 64
+  n_fft: 512
+  hop_length: 160
+  f_min: 50.0
+  f_max: 8000.0
   data_dir: "data/audio/"
   classes: ["eating", "drinking", "vomiting", "ambient", "other"]
   train_split: 0.8
