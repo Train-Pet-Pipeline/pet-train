@@ -27,6 +27,7 @@ dev = [
     "pytest-cov",
     "ruff",
     "mypy",
+    "soundfile",
 ]
 
 [tool.setuptools.packages.find]
