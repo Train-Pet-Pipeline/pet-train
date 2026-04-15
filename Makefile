@@ -1,3 +1,5 @@
+-include ../pet-infra/shared/Makefile.include
+
 .PHONY: setup test lint clean train-sft train-dpo train-audio merge collect-logits
 
 setup:
@@ -6,12 +8,6 @@ setup:
 
 test:
 	pytest tests/ -v
-
-lint:
-	ruff check src/ tests/ && mypy src/
-
-clean:
-	rm -rf .pytest_cache .mypy_cache .ruff_cache dist/ *.egg-info
 
 train-sft:
 	bash scripts/train_sft.sh $(CONFIG)
