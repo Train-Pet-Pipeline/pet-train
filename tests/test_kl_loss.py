@@ -124,5 +124,5 @@ class TestTopKKL:
             student, top_k_ids, top_k_logprobs, temperature=2.0, lambda_kl=0.1
         )
 
-        # Should be reasonably close
-        assert abs(full_loss.item() - topk_loss.item()) < 0.5
+        # With k=vocab the rest bucket is zero, so top-k KL equals full KL
+        assert abs(full_loss.item() - topk_loss.item()) < 1e-4
