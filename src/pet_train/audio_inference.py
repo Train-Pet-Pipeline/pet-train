@@ -9,6 +9,8 @@ V1: zero-shot only (no fine-tuning). Weights handed to pet-quantize for INT8 con
 import logging
 from dataclasses import dataclass
 
+import numpy as np
+import soundfile as sf
 import torch
 import torchaudio
 from pet_infra.device import detect_device
@@ -158,7 +160,13 @@ class AudioInference:
         Returns:
             AudioPrediction with label, confidence, and per-class scores.
         """
-        waveform, sr = torchaudio.load(audio_path, backend="soundfile")
+        data, sr = sf.read(audio_path, dtype="float32")
+        # soundfile returns (samples,) for mono, (samples, channels) for multi-channel
+        if data.ndim == 1:
+            data = data[np.newaxis, :]  # [1, samples]
+        else:
+            data = data.T  # [channels, samples]
+        waveform = torch.from_numpy(data)
         if sr != self.sample_rate:
             waveform = torchaudio.functional.resample(
                 waveform, orig_freq=sr, new_freq=self.sample_rate
