@@ -47,6 +47,7 @@ class APILogitsProvider(TeacherLogitsProvider):
         self.timeout = timeout
         self.max_retries = max_retries
         self._manifest = self._load_or_create_manifest()
+        self._is_full_vocab = "top_k" not in self._manifest
 
     def _load_or_create_manifest(self) -> dict:
         """Load existing manifest or create a new one."""
@@ -98,7 +99,7 @@ class APILogitsProvider(TeacherLogitsProvider):
         return LogitsResult(
             token_ids=data["token_ids"],
             logprobs=data["logprobs"],
-            is_full_vocab=False,
+            is_full_vocab=self._is_full_vocab,
         )
 
     def cache_sample(
@@ -114,7 +115,8 @@ class APILogitsProvider(TeacherLogitsProvider):
             token_ids: Top-k token IDs [seq_len, k].
             logprobs: Corresponding log probabilities [seq_len, k].
         """
-        filename = f"{sample_id}.pt"
+        safe_id = sample_id.replace("/", "_").replace("..", "_")
+        filename = f"{safe_id}.pt"
         torch.save(
             {"token_ids": token_ids, "logprobs": logprobs},
             self.cache_dir / filename,
