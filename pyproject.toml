@@ -27,7 +27,6 @@ dev = [
     "pytest-cov",
     "ruff",
     "mypy",
-    "torchcodec",
 ]
 
 [tool.setuptools.packages.find]
