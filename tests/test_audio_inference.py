@@ -1,10 +1,11 @@
 """Tests for zero-shot audio inference module."""
 
+import wave
 from pathlib import Path
 
+import numpy as np
 import pytest
 import torch
-import torchaudio
 
 from pet_train.audio_inference import (
     AUDIOSET_CLASS_MAP,
@@ -14,12 +15,16 @@ from pet_train.audio_inference import (
 )
 
 
-def _create_wav(path: Path, sample_rate: int = 16000, duration_s: float = 1.0):
-    """Helper to create a dummy WAV file."""
+def _create_wav(path: Path, sample_rate: int = 16000, duration_s: float = 1.0, channels: int = 1):
+    """Helper to create a dummy WAV file using stdlib wave module."""
     path.parent.mkdir(parents=True, exist_ok=True)
     samples = int(sample_rate * duration_s)
-    waveform = torch.randn(1, samples)
-    torchaudio.save(str(path), waveform, sample_rate)
+    data = (np.random.randn(samples * channels) * 32767).astype(np.int16)
+    with wave.open(str(path), "w") as wf:
+        wf.setnchannels(channels)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        wf.writeframes(data.tobytes())
     return path
 
 
@@ -72,10 +77,7 @@ class TestAudioInference:
 
     def test_predict_handles_stereo(self, tmp_dir):
         """predict() handles stereo audio by converting to mono."""
-        path = tmp_dir / "stereo.wav"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        waveform = torch.randn(2, 16000)  # stereo
-        torchaudio.save(str(path), waveform, 16000)
+        path = _create_wav(tmp_dir / "stereo.wav", channels=2)
         model = AudioInference(pretrained_path=None)
         result = model.predict(str(path))
         assert isinstance(result, AudioPrediction)

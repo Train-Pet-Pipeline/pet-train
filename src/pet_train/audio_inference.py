@@ -9,8 +9,11 @@ V1: zero-shot only (no fine-tuning). Weights handed to pet-quantize for INT8 con
 import logging
 from dataclasses import dataclass
 
+import numpy as np
+import soundfile as sf
 import torch
 import torchaudio
+from pet_infra.device import detect_device
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +76,7 @@ class AudioInference:
     def __init__(
         self,
         pretrained_path: str | None = None,
-        device: str = "cpu",
+        device: str | None = None,
         sample_rate: int = 16000,
     ):
         """Initialize AudioInference classifier.
@@ -81,9 +84,11 @@ class AudioInference:
         Args:
             pretrained_path: Path to PANNs MobileNetV2 .pth checkpoint.
                 If None, uses random weights (for testing only).
-            device: Torch device string.
+            device: Torch device string. If None, auto-detected via detect_device().
             sample_rate: Expected audio sample rate.
         """
+        if device is None:
+            device = detect_device()
         self.device = torch.device(device)
         self.sample_rate = sample_rate
         self._pretrained_path = pretrained_path
@@ -155,7 +160,13 @@ class AudioInference:
         Returns:
             AudioPrediction with label, confidence, and per-class scores.
         """
-        waveform, sr = torchaudio.load(audio_path)
+        data, sr = sf.read(audio_path, dtype="float32")
+        # soundfile returns (samples,) for mono, (samples, channels) for multi-channel
+        if data.ndim == 1:
+            data = data[np.newaxis, :]  # [1, samples]
+        else:
+            data = data.T  # [channels, samples]
+        waveform = torch.from_numpy(data)
         if sr != self.sample_rate:
             waveform = torchaudio.functional.resample(
                 waveform, orig_freq=sr, new_freq=self.sample_rate
