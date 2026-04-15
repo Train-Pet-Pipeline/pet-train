@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 import torch
 import torchaudio
+from pet_infra.device import detect_device
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ class AudioInference:
     def __init__(
         self,
         pretrained_path: str | None = None,
-        device: str = "cpu",
+        device: str | None = None,
         sample_rate: int = 16000,
     ):
         """Initialize AudioInference classifier.
@@ -81,9 +82,11 @@ class AudioInference:
         Args:
             pretrained_path: Path to PANNs MobileNetV2 .pth checkpoint.
                 If None, uses random weights (for testing only).
-            device: Torch device string.
+            device: Torch device string. If None, auto-detected via detect_device().
             sample_rate: Expected audio sample rate.
         """
+        if device is None:
+            device = detect_device()
         self.device = torch.device(device)
         self.sample_rate = sample_rate
         self._pretrained_path = pretrained_path
