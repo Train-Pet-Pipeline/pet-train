@@ -103,7 +103,7 @@ class AudioInference:
         Returns:
             Loaded model in eval mode.
         """
-        from src.audio_model_arch import MobileNetV2AudioSet
+        from pet_train.audio_model_arch import MobileNetV2AudioSet
 
         model = MobileNetV2AudioSet(num_classes=527, sample_rate=self.sample_rate)
         if pretrained_path is not None:

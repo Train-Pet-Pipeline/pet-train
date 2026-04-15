@@ -6,7 +6,7 @@ import pytest
 import torch
 import torchaudio
 
-from src.audio_inference import (
+from pet_train.audio_inference import (
     AUDIOSET_CLASS_MAP,
     CLASSES,
     AudioInference,
