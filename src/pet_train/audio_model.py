@@ -229,7 +229,7 @@ def main() -> None:
         num_classes=num_classes,
     )
 
-    callbacks = []
+    callbacks: list[pl.callbacks.Callback] = []
     if train_cfg.get("early_stopping_patience"):
         callbacks.append(pl.callbacks.EarlyStopping(
             monitor="val_loss",

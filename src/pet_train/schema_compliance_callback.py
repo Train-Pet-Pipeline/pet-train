@@ -24,7 +24,7 @@ def load_compliance_val_set(path: str) -> list[dict]:
     Returns:
         List of parsed JSON items.
     """
-    items = []
+    items: list[dict] = []
     file_path = Path(path)
     if not file_path.exists():
         logger.warning("Compliance validation file not found: %s", path)
