@@ -126,7 +126,11 @@ Optional additional loss term during SFT. Controlled by `params.yaml` `kl_distil
 
 Total loss = CE_loss(student, teacher_text) + label_smoothing + lambda * KL_loss(student_logits, teacher_logits)
 
-### 4.2 kl_loss.py
+### 4.2 Integration with LLaMA-Factory
+
+KL distillation is injected via a custom Trainer subclass that overrides `compute_loss()`. The subclass adds the KL term to LLaMA-Factory's native CE loss. Registered through LLaMA-Factory's callback/plugin mechanism — no monkey-patching or fork modifications.
+
+### 4.3 kl_loss.py
 
 Two modes:
 
@@ -143,7 +147,7 @@ def compute_kl_distillation_loss(
     """Temperature-softened KL divergence."""
 ```
 
-### 4.3 TeacherLogitsProvider Interface
+### 4.4 TeacherLogitsProvider Interface
 
 ```python
 class TeacherLogitsProvider(ABC):
@@ -157,13 +161,13 @@ class LogitsResult:
     is_full_vocab: bool          # True=full distribution, False=top-k
 ```
 
-### 4.4 FileProvider
+### 4.5 FileProvider
 
 - Reads pre-computed .pt files from `data/teacher_logits/`
 - `manifest.json` maps sample_id to file path, records model name, collection time, top-k value
 - Supports logits from any model (Qwen-72B, DeepSeek, LLaMA-70B, etc.)
 
-### 4.5 APIProvider
+### 4.6 APIProvider
 
 - Calls OpenAI-compatible APIs with `logprobs=true, top_logprobs=20`
 - First call: fetch from API, cache to disk in same format as FileProvider
@@ -171,7 +175,7 @@ class LogitsResult:
 - tenacity retry, structured JSON logging
 - Supports any compatible API (Dashscope, DeepSeek, OpenAI, etc.)
 
-### 4.6 collect_logits.sh
+### 4.7 collect_logits.sh
 
 Standalone pre-training script:
 
@@ -442,6 +446,8 @@ LLaMA-Factory installed from vendor source via `make setup`, not in pyproject.to
 |---------------|-------------|--------|--------|
 | MobileNetV3 + MFCC 40-dim | PANNs MobileNetV2 + log-mel 64-bin | Pretrained transfer learning is more practical than training from scratch | Update DEVELOPMENT_GUIDE |
 | KL distillation always on | KL optional, label_smoothing as default softening | Teacher logits require separate collection step | Update DEVELOPMENT_GUIDE |
+| Audio: 4 classes (chewing, drinking, vocalization, pre_vomit) | 5 classes (eating, drinking, vomiting, ambient, other) | Coarse-grained to avoid guessing; added ambient+other for robustness | Update DEVELOPMENT_GUIDE |
+| No logits_provider module | src/logits_provider/ (base, file, api) | Support both offline and API teacher logits | Update DEVELOPMENT_GUIDE |
 | CNN14 (discussed) | MobileNetV2 | CNN14 ~80M too heavy for lightweight audio module | N/A (CNN14 was discussion only) |
 
 DEVELOPMENT_GUIDE will be updated to reflect these deviations after spec approval.
