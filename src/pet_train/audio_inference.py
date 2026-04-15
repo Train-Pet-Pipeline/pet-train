@@ -158,7 +158,7 @@ class AudioInference:
         Returns:
             AudioPrediction with label, confidence, and per-class scores.
         """
-        waveform, sr = torchaudio.load(audio_path)
+        waveform, sr = torchaudio.load(audio_path, backend="soundfile")
         if sr != self.sample_rate:
             waveform = torchaudio.functional.resample(
                 waveform, orig_freq=sr, new_freq=self.sample_rate
