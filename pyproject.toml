@@ -9,7 +9,7 @@ name = "pet-train"
 version = "0.1.0"
 requires-python = ">=3.11,<3.12"
 dependencies = [
-    "pet-schema",
+    "pet-schema @ git+https://github.com/Train-Pet-Pipeline/pet-schema.git@v1.0.0",
     "pet-infra @ git+https://github.com/Train-Pet-Pipeline/pet-infra.git@v1.0.0",
     "torch>=2.1",
     "torchaudio>=2.1",
