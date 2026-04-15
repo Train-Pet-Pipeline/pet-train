@@ -14,6 +14,7 @@ lora_target: q_proj,v_proj
 freeze_vision_tower: true
 
 # Training
+do_train: true
 cutoff_len: 4096
 per_device_train_batch_size: 4
 gradient_accumulation_steps: 8

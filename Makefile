@@ -3,8 +3,8 @@
 .PHONY: setup test lint clean train-sft train-dpo train-audio merge collect-logits
 
 setup:
-	pip install -e ".[dev]"
-	cd vendor/LLaMA-Factory && pip install -e ".[torch,metrics]"
+	python -m pip install -e ".[dev]"
+	cd vendor/LLaMA-Factory && python -m pip install -e ".[metrics]"
 
 test:
 	pytest tests/ -v

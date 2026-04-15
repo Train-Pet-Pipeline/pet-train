@@ -56,12 +56,26 @@ class MobileNetV2AudioSet(nn.Module):
     Architecture compatible with PANNs pretrained checkpoints.
     """
 
-    def __init__(self, num_classes: int = 527, sample_rate: int = 16000):
+    def __init__(
+        self,
+        num_classes: int = 527,
+        sample_rate: int = 16000,
+        n_mels: int = 64,
+        n_fft: int = 512,
+        hop_length: int = 160,
+        f_min: float = 50.0,
+        f_max: float = 8000.0,
+    ):
         """Initialize MobileNetV2AudioSet model.
 
         Args:
             num_classes: Number of output classes (527 for AudioSet).
-            sample_rate: Audio sample rate used for mel spectrogram transform.
+            sample_rate: Audio sample rate (from params.yaml audio.sample_rate).
+            n_mels: Number of mel bands (from params.yaml audio.n_mels).
+            n_fft: FFT window size.
+            hop_length: Hop length for STFT.
+            f_min: Minimum frequency for mel filterbank.
+            f_max: Maximum frequency for mel filterbank.
         """
         super().__init__()
         self.num_classes = num_classes
@@ -69,11 +83,11 @@ class MobileNetV2AudioSet(nn.Module):
         # Mel spectrogram front-end — created ONCE here in __init__, not in forward()
         self.mel_transform = transforms.MelSpectrogram(
             sample_rate=sample_rate,
-            n_fft=512,
-            hop_length=160,
-            n_mels=64,
-            f_min=50.0,
-            f_max=8000.0,
+            n_fft=n_fft,
+            hop_length=hop_length,
+            n_mels=n_mels,
+            f_min=f_min,
+            f_max=f_max,
         )
 
         # Mel spectrogram front-end convolutional stem
