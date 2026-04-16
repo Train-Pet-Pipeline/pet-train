@@ -14,6 +14,7 @@ lora_target: q_proj,v_proj
 freeze_vision_tower: true
 
 # Training
+do_train: true
 cutoff_len: 4096
 per_device_train_batch_size: 4
 gradient_accumulation_steps: 8
@@ -22,7 +23,9 @@ num_train_epochs: 3
 lr_scheduler_type: cosine
 warmup_ratio: 0.1
 bf16: true
-label_smoothing_factor: 0.1
+# VLM 大词表 (~152K) 下 label_smoothing > 0 会触发 log_softmax 全词表计算,
+# 导致显存爆炸 (RTX 5090 32GB OOM). 详见摩擦点 #12.
+label_smoothing_factor: 0.0
 
 # Data
 dataset_dir: data/

@@ -18,6 +18,8 @@ pref_beta: 0.1
 pref_loss: sigmoid
 
 # Training
+do_train: true
+cutoff_len: 4096
 per_device_train_batch_size: 2
 gradient_accumulation_steps: 16
 learning_rate: 5.0e-5
