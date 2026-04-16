@@ -93,7 +93,7 @@ llamafactory-cli train "$MERGED_CONFIG"
 echo "=== SFT training complete ==="
 echo "Adapter saved to: $OUTPUT_DIR"
 
-if command -v pet-eval &>/dev/null; then
+if python3 -c "import pet_eval" 2>/dev/null; then
     echo "Running post-training evaluation..."
     bash "$SCRIPT_DIR/eval_after_train.sh" "$OUTPUT_DIR" "$RUN_NAME"
 else
