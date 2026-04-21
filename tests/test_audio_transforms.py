@@ -3,7 +3,7 @@
 
 import torch
 
-from pet_train.audio_transforms import AudioTransform
+from pet_train.audio.transforms import AudioTransform
 
 
 class TestAudioTransform:
