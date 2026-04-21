@@ -1,2 +1,0 @@
-### Baseline SFT experiment: LoRA r=16, lr=2e-4, 3 epochs
-### Inherits all other settings from configs/base/sft_base.yaml
