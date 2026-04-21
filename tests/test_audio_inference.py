@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import torch
 
-from pet_train.audio_inference import (
+from pet_train.audio.inference import (
     AUDIOSET_CLASS_MAP,
     CLASSES,
     AudioInference,
