@@ -1,0 +1,55 @@
+name: peer-dep-smoke
+
+on:
+  pull_request:
+    branches: [dev, main]
+
+jobs:
+  install-order-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Configure git for private repos
+        run: git config --global url."https://x-access-token:${{ secrets.CROSS_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
+
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y libsndfile1
+
+      - name: Step 1 — install pet-infra (peer-dep, matrix 2026.07-rc)
+        run: pip install 'pet-infra @ git+https://github.com/Train-Pet-Pipeline/pet-infra@v2.3.0-rc1'
+
+      - name: Step 2 — install pet-train editable, no-deps
+        run: pip install -e . --no-deps
+
+      - name: Step 3 — re-resolve dev extras
+        run: pip install -e ".[dev]"
+
+      - name: Step 4 — assert peer-dep version (§11.4)
+        run: python -c "import pet_infra; assert pet_infra.__version__.startswith('2.'), f'unexpected pet_infra version {pet_infra.__version__}'"
+
+      - name: Smoke — register_all and assert 3 trainers registered
+        run: |
+          python -c "
+          from pet_train.plugins._register import register_all
+          register_all()
+          from pet_infra.registry import TRAINERS
+          expected = {'llamafactory_sft', 'llamafactory_dpo', 'tiny_test'}
+          got = set(TRAINERS.module_dict.keys())
+          missing = expected - got
+          assert not missing, f'missing trainers in registry: {missing}; got: {got}'
+          print(f'all 3 trainers registered: {sorted(expected)}')"
+
+      - name: Smoke — entry-point discovery
+        run: |
+          python -c "
+          from importlib.metadata import entry_points
+          eps = entry_points(group='pet_infra.plugins')
+          names = {ep.name for ep in eps}
+          assert 'pet_train' in names, f'pet_train entry-point missing; got: {names}'
+          print(f'pet_train entry-point discoverable via pet_infra.plugins group')"

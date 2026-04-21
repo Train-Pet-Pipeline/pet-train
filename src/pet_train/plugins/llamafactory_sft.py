@@ -1,0 +1,111 @@
+"""LlamaFactorySFTTrainer — thin wrapper over llamafactory.train.sft.workflow.run_sft."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import subprocess
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+from pet_infra.registry import TRAINERS
+from pet_schema.model_card import ModelCard
+
+
+@TRAINERS.register_module(name="llamafactory_sft")
+class LlamaFactorySFTTrainer:
+    """SFT training plugin wrapping LLaMA-Factory's `run_sft` workflow.
+
+    Expected config keys (passed via Registry.build kwargs):
+      base_model, dataset, output_dir, lora_r, lora_alpha, lr, batch_size,
+      grad_accum, max_steps. Optional: version, trained_by, dataset_versions.
+    """
+
+    def __init__(self, **cfg: Any) -> None:
+        self._cfg: dict[str, Any] = dict(cfg)
+        self._lf_args: dict[str, Any] = self._hydra_to_lf_args(self._cfg)
+        self._output_dir: str = str(cfg["output_dir"])
+        self._adapter_uri: str | None = None
+
+    @staticmethod
+    def _hydra_to_lf_args(cfg: dict[str, Any]) -> dict[str, Any]:
+        """Map hydra recipe config keys to LLaMA-Factory run_sft kwargs."""
+        return {
+            "model_name_or_path": cfg["base_model"],
+            "dataset": cfg["dataset"],
+            "lora_rank": cfg["lora_r"],
+            "lora_alpha": cfg["lora_alpha"],
+            "learning_rate": cfg["lr"],
+            "per_device_train_batch_size": cfg["batch_size"],
+            "gradient_accumulation_steps": cfg["grad_accum"],
+            "max_steps": cfg["max_steps"],
+            "output_dir": cfg["output_dir"],
+            "finetuning_type": "lora",
+            "stage": "sft",
+        }
+
+    def run(self, input_card: ModelCard | None, recipe: Any) -> ModelCard:
+        """Execute SFT training and return a populated ModelCard.
+
+        Lazy-imports run_sft so module import doesn't fail when LLaMA-Factory's
+        transformers pin is mismatched in dev/CI envs that only run unit tests.
+        """
+        from llamafactory.train.sft.workflow import run_sft
+
+        run_sft(**self._lf_args)
+        self._adapter_uri = f"file://{Path(self._output_dir).resolve()}/adapter"
+        return self._build_model_card(input_card, recipe)
+
+    def _build_model_card(self, input_card: ModelCard | None, recipe: Any) -> ModelCard:
+        """Construct a ModelCard from training config and recipe metadata."""
+        recipe_id = getattr(recipe, "recipe_id", "unknown")
+        version = self._cfg.get("version") or getattr(recipe, "schema_version", "0.0.0")
+        parent_models = [input_card.id] if input_card is not None else []
+        lineage_role = "sft_base" if input_card is None else None
+
+        return ModelCard(
+            id="",  # orchestrator overwrites via card.id = card_id
+            version=str(version),
+            modality="vision",
+            task="sft",
+            arch=self._derive_arch(),
+            training_recipe=recipe_id,
+            recipe_id=recipe_id,
+            hydra_config_sha=self._hash_lf_args(),
+            git_shas=self._collect_git_shas(),
+            dataset_versions=self._cfg.get("dataset_versions") or {},
+            checkpoint_uri=self._adapter_uri or "",
+            parent_models=parent_models,
+            lineage_role=lineage_role,
+            metrics={},
+            gate_status="pending",
+            trained_at=datetime.now(UTC),
+            trained_by=self._cfg.get("trained_by") or os.environ.get("USER", "ci"),
+        )
+
+    def _derive_arch(self) -> str:
+        """Derive a short architecture string from base model + LoRA config."""
+        base = str(self._cfg["base_model"]).split("/")[-1].lower()
+        r = self._lf_args["lora_rank"]
+        a = self._lf_args["lora_alpha"]
+        return f"{base}_lora_r{r}_a{a}"
+
+    def _hash_lf_args(self) -> str:
+        """Compute SHA-256 of the serialized LLaMA-Factory args dict."""
+        payload = json.dumps(self._lf_args, sort_keys=True, default=str).encode()
+        return hashlib.sha256(payload).hexdigest()
+
+    @staticmethod
+    def _collect_git_shas() -> dict[str, str]:
+        """Return dict of repo->SHA for provenance; returns empty dict on failure."""
+        try:
+            sha = subprocess.check_output(
+                ["git", "rev-parse", "HEAD"],
+                stderr=subprocess.DEVNULL,
+                text=True,
+            ).strip()
+            return {"pet_train": sha}
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return {}
