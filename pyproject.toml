@@ -9,8 +9,7 @@ name = "pet-train"
 version = "0.1.0"
 requires-python = ">=3.11,<3.12"
 dependencies = [
-    "pet-schema @ git+https://github.com/Train-Pet-Pipeline/pet-schema.git@v1.0.0",
-    "pet-infra @ git+https://github.com/Train-Pet-Pipeline/pet-infra.git@v1.0.0",
+    "pet-schema",
     "torch>=2.1",
     "torchaudio>=2.1",
     "pytorch-lightning>=2.1",
@@ -29,6 +28,9 @@ dev = [
     "mypy",
     "soundfile",
 ]
+
+[project.entry-points."pet_infra.plugins"]
+pet_train = "pet_train.plugins._register:register_all"
 
 [tool.setuptools.packages.find]
 where = [
