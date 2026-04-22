@@ -21,5 +21,3 @@ data/
 # OS
 .DS_Store
 
-# Wandb
-wandb/
