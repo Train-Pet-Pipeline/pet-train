@@ -25,8 +25,8 @@ jobs:
       - name: Install system deps
         run: sudo apt-get update && sudo apt-get install -y libsndfile1
 
-      - name: Install pet-infra (peer-dep, per compatibility_matrix 2026.07-rc)
-        run: pip install 'pet-infra @ git+https://github.com/Train-Pet-Pipeline/pet-infra@v2.3.0-rc1'
+      - name: Install pet-infra (peer-dep, per compatibility_matrix 2026.09)
+        run: pip install 'pet-infra @ git+https://github.com/Train-Pet-Pipeline/pet-infra@v2.5.0'
 
       - name: Install pet-train (editable, no-deps over pet-infra)
         run: pip install -e ".[dev]" --no-deps
