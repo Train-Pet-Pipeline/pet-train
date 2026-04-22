@@ -45,8 +45,3 @@ audio:
   train_split: 0.8
   val_split: 0.1
   test_split: 0.1
-
-# === Common ===
-wandb:
-  project: "pet-train"
-  entity: ""
