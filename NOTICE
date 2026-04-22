@@ -1,0 +1,9 @@
+Train-Pet-Pipeline / pet-train
+Copyright 2026 Train-Pet-Pipeline
+
+This product includes software developed at:
+
+- LLaMA-Factory (vendor/LLaMA-Factory/)
+  Licensed under the Apache License, Version 2.0
+  https://github.com/hiyouga/LLaMA-Factory
+  See vendor/LLaMA-Factory/LICENSE for full text.
