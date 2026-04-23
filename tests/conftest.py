@@ -27,15 +27,6 @@ def sample_params(tmp_dir):
             "compliance_sample_size": 3,
             "label_smoothing_factor": 0.1,
         },
-        "kl_distillation": {
-            "enabled": False,
-            "lambda_kl": 0.1,
-            "temperature": 2.0,
-            "top_k_approx": True,
-            "top_k": 5,
-            "provider": "file",
-            "logits_dir": str(tmp_dir / "logits"),
-        },
         "audio": {
             "sample_rate": 16000,
             "n_mels": 64,
