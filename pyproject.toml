@@ -10,7 +10,6 @@ version = "2.0.1"
 license = {text = "BUSL-1.1"}
 requires-python = ">=3.11,<3.12"
 dependencies = [
-    "pet-schema",
     "torch>=2.1",
     "torchaudio>=2.1",
     "pytorch-lightning>=2.1",
