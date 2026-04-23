@@ -36,10 +36,14 @@ jobs:
       - name: Step 5 — assert peer-dep versions (§11.4)
         run: |
           python -c "
-          import pet_schema, pet_infra
-          assert pet_schema.__version__ == '3.2.1', f'unexpected pet_schema version {pet_schema.__version__}'
+          import importlib.metadata
+          import pet_infra
+          from pet_schema.version import SCHEMA_VERSION
+          schema_v = importlib.metadata.version('pet-schema')
+          assert schema_v == '3.2.1', f'unexpected pet_schema version {schema_v}'
+          assert SCHEMA_VERSION == '3.2.1', f'SCHEMA_VERSION drift: {SCHEMA_VERSION}'
           assert pet_infra.__version__.startswith('2.6.'), f'unexpected pet_infra version {pet_infra.__version__}'
-          print('peer-dep versions OK:', pet_schema.__version__, pet_infra.__version__)
+          print('peer-dep versions OK: pet_schema', schema_v, ', pet_infra', pet_infra.__version__)
           "
 
       - name: Smoke — register_all and assert 3 trainers registered
