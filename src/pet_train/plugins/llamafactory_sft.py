@@ -60,7 +60,13 @@ class LlamaFactorySFTTrainer:
         data_path = self._cfg.get("data_path")
         if data_path:
             dp = Path(data_path)
-            if dp.exists() and dp.suffix == ".jsonl":
+            if not dp.exists():
+                raise FileNotFoundError(
+                    f"Training data file not found: {dp}. "
+                    f"Check annotation.llm.data_path in params.yaml or run "
+                    f"pet-annotation export first."
+                )
+            if dp.suffix == ".jsonl":
                 validate_sft_jsonl(dp)
 
         from llamafactory.train.sft.workflow import run_sft

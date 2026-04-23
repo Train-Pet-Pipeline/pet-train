@@ -64,7 +64,13 @@ class LlamaFactoryDPOTrainer:
         data_path = self._cfg.get("data_path")
         if data_path:
             dp = Path(data_path)
-            if dp.exists() and dp.suffix == ".jsonl":
+            if not dp.exists():
+                raise FileNotFoundError(
+                    f"DPO training data file not found: {dp}. "
+                    f"Check dpo.data_path in params.yaml or run "
+                    f"pet-annotation export --format=dpo first."
+                )
+            if dp.suffix == ".jsonl":
                 validate_dpo_jsonl(dp)
 
         from llamafactory.train.dpo.workflow import run_dpo
