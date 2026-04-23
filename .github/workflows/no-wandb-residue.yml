@@ -1,0 +1,44 @@
+name: no-wandb-residue
+
+# Positive-list CI guard: scans only the live runtime surface for W&B residue.
+#
+# Why positive-list instead of exclusion-list:
+#   Only first-party code is scanned. vendor/ contains LLaMA-Factory source
+#   which intentionally references W&B. Maintaining an exclusion list for
+#   vendored code is fragile — any new vendored dep with W&B refs would break CI.
+#   Instead we enumerate only what SHOULD be clean: src/, tests/, .github/,
+#   and params.yaml. Vendored third-party code is never scanned.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan for wandb references in live first-party code
+        run: |
+          set -e
+
+          # Scan live code / config files — exclude vendor/ and this guard workflow itself.
+          MATCHES=$(grep -rEn '\bwandb\b' \
+            --include='*.py' --include='*.yaml' --include='*.yml' \
+            --include='*.toml' --include='*.sh' \
+            --exclude='no-wandb-residue.yml' \
+            src/ tests/ .github/ 2>/dev/null || true)
+
+          # Also scan params.yaml directly
+          MATCHES_PARAMS=$(grep -En '\bwandb\b' params.yaml 2>/dev/null || true)
+
+          ALL="${MATCHES}${MATCHES_PARAMS}"
+
+          if [ -n "$ALL" ]; then
+            echo "::error::W&B residue found in first-party code. Remove it and use ClearML instead."
+            echo "$ALL"
+            exit 1
+          fi
+
+          echo "Clean — no W&B residue detected in first-party code."
