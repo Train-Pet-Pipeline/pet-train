@@ -2,7 +2,14 @@
 
 Converts raw waveforms to log-mel spectrograms compatible with PANNs models.
 Optionally applies SpecAugment during training.
+
+params.yaml keys consumed (under audio:):
+  sample_rate, n_mels, n_fft, hop_length, f_min, f_max
 """
+
+from __future__ import annotations
+
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -58,6 +65,28 @@ class AudioTransform(nn.Module):
         if spec_augment:
             self.time_mask = ta_transforms.TimeMasking(time_mask_param=time_mask_param)
             self.freq_mask = ta_transforms.FrequencyMasking(freq_mask_param=freq_mask_param)
+
+    @classmethod
+    def from_params(cls, params: dict[str, Any], **override: Any) -> AudioTransform:
+        """Construct from params.yaml audio sub-dict.
+
+        Args:
+            params: The ``audio:`` sub-dict from params.yaml.
+            **override: Any explicit kwarg overrides (e.g. spec_augment=True).
+
+        Returns:
+            Configured AudioTransform instance.
+        """
+        kwargs = {
+            "sample_rate": params["sample_rate"],
+            "n_mels": params["n_mels"],
+            "n_fft": params["n_fft"],
+            "hop_length": params["hop_length"],
+            "f_min": params["f_min"],
+            "f_max": params["f_max"],
+        }
+        kwargs.update(override)
+        return cls(**kwargs)
 
     def forward(
         self, waveform: torch.Tensor, input_sample_rate: int | None = None

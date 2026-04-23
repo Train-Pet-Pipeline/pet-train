@@ -12,10 +12,18 @@ from __future__ import annotations
 def register_all() -> None:
     """Import pet-train plugin modules to trigger trainer registration side-effects."""
     try:
-        import pet_infra  # noqa: F401  # peer-dep guard
+        import pet_schema  # noqa: F401
     except ImportError as e:
         raise RuntimeError(
-            "pet-train v2 requires pet-infra. Install via matrix row 2026.07."
+            "pet-train v2.x requires pet-schema to be installed first. "
+            "Install via matrix row (pet-infra/docs/compatibility_matrix.yaml)."
+        ) from e
+    try:
+        import pet_infra  # noqa: F401
+    except ImportError as e:
+        raise RuntimeError(
+            "pet-train v2.x requires pet-infra to be installed first. "
+            "Install via matrix row (pet-infra/docs/compatibility_matrix.yaml)."
         ) from e
 
     # Trainer plugin imports (P1-D/E/F fill these with actual @TRAINERS.register_module classes)

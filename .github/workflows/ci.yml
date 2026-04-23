@@ -25,17 +25,30 @@ jobs:
       - name: Install system deps
         run: sudo apt-get update && sudo apt-get install -y libsndfile1
 
+      - name: Install pet-schema (peer-dep, per compatibility_matrix 2026.09)
+        run: pip install 'pet-schema @ git+https://github.com/Train-Pet-Pipeline/pet-schema@v3.2.1'
+
       - name: Install pet-infra (peer-dep, per compatibility_matrix 2026.09)
-        run: pip install 'pet-infra @ git+https://github.com/Train-Pet-Pipeline/pet-infra@v2.5.0'
+        run: pip install 'pet-infra @ git+https://github.com/Train-Pet-Pipeline/pet-infra@v2.6.0'
 
-      - name: Install pet-train (editable, no-deps over pet-infra)
-        run: pip install -e ".[dev]" --no-deps
+      - name: Install pet-train (editable, no-deps over peer-deps)
+        run: pip install -e . --no-deps
 
-      - name: Re-resolve remaining deps
+      - name: Re-resolve dev extras
         run: pip install -e ".[dev]"
 
-      - name: Assert pet-infra version (peer-dep guard per DEVELOPMENT_GUIDE §11.4)
-        run: python -c "import pet_infra; assert pet_infra.__version__.startswith('2.'), f'unexpected pet_infra version {pet_infra.__version__}'"
+      - name: Assert peer-dep versions (§11.4)
+        run: |
+          python -c "
+          import importlib.metadata
+          import pet_infra
+          from pet_schema.version import SCHEMA_VERSION
+          schema_v = importlib.metadata.version('pet-schema')
+          assert schema_v == '3.2.1', f'unexpected pet_schema version {schema_v}'
+          assert SCHEMA_VERSION == '3.2.1', f'SCHEMA_VERSION drift: {SCHEMA_VERSION}'
+          assert pet_infra.__version__.startswith('2.6.'), f'unexpected pet_infra version {pet_infra.__version__}'
+          print('peer-dep versions OK: pet_schema', schema_v, ', pet_infra', pet_infra.__version__)
+          "
 
       - name: Lint
         run: ruff check src/ tests/ && mypy src/
