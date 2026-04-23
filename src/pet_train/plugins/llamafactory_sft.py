@@ -13,6 +13,8 @@ from typing import Any
 from pet_infra.registry import TRAINERS
 from pet_schema.model_card import ModelCard
 
+from pet_train.plugins.data_validation import validate_sft_jsonl
+
 
 @TRAINERS.register_module(name="llamafactory_sft")
 class LlamaFactorySFTTrainer:
@@ -49,9 +51,18 @@ class LlamaFactorySFTTrainer:
     def run(self, input_card: ModelCard | None, recipe: Any) -> ModelCard:
         """Execute SFT training and return a populated ModelCard.
 
+        Validates the JSONL data file against pet-schema ShareGPTSFTSample before
+        passing it to LLaMA-Factory (F11 consumer-side defense).
+
         Lazy-imports run_sft so module import doesn't fail when LLaMA-Factory's
         transformers pin is mismatched in dev/CI envs that only run unit tests.
         """
+        data_path = self._cfg.get("data_path")
+        if data_path:
+            dp = Path(data_path)
+            if dp.exists() and dp.suffix == ".jsonl":
+                validate_sft_jsonl(dp)
+
         from llamafactory.train.sft.workflow import run_sft
 
         run_sft(**self._lf_args)
