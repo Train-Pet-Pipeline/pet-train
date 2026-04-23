@@ -2,7 +2,16 @@
 
 Minimal implementation compatible with PANNs pretrained weights.
 Used by audio_inference.py for zero-shot inference.
+
+params.yaml keys consumed (under audio:):
+  sample_rate, n_mels, n_fft, hop_length, f_min, f_max
+  num_classes is NOT in params.yaml — it is the PANNs/AudioSet architecture
+  constant (527) and must never change to maintain weight compatibility.
 """
+
+from __future__ import annotations
+
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -58,7 +67,7 @@ class MobileNetV2AudioSet(nn.Module):
 
     def __init__(
         self,
-        num_classes: int = 527,
+        num_classes: int = 527,  # PANNs/AudioSet architecture constant — do not change
         sample_rate: int = 16000,
         n_mels: int = 64,
         n_fft: int = 512,
@@ -69,13 +78,14 @@ class MobileNetV2AudioSet(nn.Module):
         """Initialize MobileNetV2AudioSet model.
 
         Args:
-            num_classes: Number of output classes (527 for AudioSet).
+            num_classes: Number of AudioSet output classes. Must be 527 for PANNs
+                weight compatibility. This is an architecture constant, not tunable.
             sample_rate: Audio sample rate (from params.yaml audio.sample_rate).
             n_mels: Number of mel bands (from params.yaml audio.n_mels).
-            n_fft: FFT window size.
-            hop_length: Hop length for STFT.
-            f_min: Minimum frequency for mel filterbank.
-            f_max: Maximum frequency for mel filterbank.
+            n_fft: FFT window size (from params.yaml audio.n_fft).
+            hop_length: Hop length for STFT (from params.yaml audio.hop_length).
+            f_min: Minimum frequency for mel filterbank (from params.yaml audio.f_min).
+            f_max: Maximum frequency for mel filterbank (from params.yaml audio.f_max).
         """
         super().__init__()
         self.num_classes = num_classes
@@ -113,6 +123,28 @@ class MobileNetV2AudioSet(nn.Module):
 
         self.pool = nn.AdaptiveAvgPool2d(1)
         self.classifier = nn.Linear(1280, num_classes)
+
+    @classmethod
+    def from_params(cls, params: dict[str, Any]) -> MobileNetV2AudioSet:
+        """Construct from params.yaml audio sub-dict.
+
+        num_classes is fixed at 527 (PANNs/AudioSet constant — not in params.yaml).
+
+        Args:
+            params: The ``audio:`` sub-dict from params.yaml.
+
+        Returns:
+            Configured MobileNetV2AudioSet with 527 output classes.
+        """
+        return cls(
+            num_classes=527,  # PANNs/AudioSet architecture constant
+            sample_rate=params["sample_rate"],
+            n_mels=params["n_mels"],
+            n_fft=params["n_fft"],
+            hop_length=params["hop_length"],
+            f_min=params["f_min"],
+            f_max=params["f_max"],
+        )
 
     def forward(self, waveform: torch.Tensor) -> torch.Tensor:
         """Forward pass from waveform to class logits.
