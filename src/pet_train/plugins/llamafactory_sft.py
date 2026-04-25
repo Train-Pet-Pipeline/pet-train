@@ -34,20 +34,25 @@ class LlamaFactorySFTTrainer:
     @staticmethod
     def _hydra_to_lf_args(cfg: dict[str, Any]) -> dict[str, Any]:
         """Map hydra recipe config keys to LLaMA-Factory run_exp args dict."""
+        # F013 fix: honor cfg["finetuning_type"]; default lora for backward compat.
+        # When finetuning_type=full, lora_rank/lora_alpha are ignored by LF.
+        ft_type = cfg.get("finetuning_type", "lora")
         args: dict[str, Any] = {
             "model_name_or_path": cfg["base_model"],
             "dataset": cfg["dataset"],
-            "lora_rank": cfg["lora_r"],
-            "lora_alpha": cfg["lora_alpha"],
             "learning_rate": cfg["lr"],
             "per_device_train_batch_size": cfg["batch_size"],
             "gradient_accumulation_steps": cfg["grad_accum"],
             "max_steps": cfg["max_steps"],
             "output_dir": cfg["output_dir"],
-            "finetuning_type": "lora",
+            "finetuning_type": ft_type,
             "stage": "sft",
             "do_train": True,
         }
+        # LoRA hyperparameters only when finetuning_type=lora
+        if ft_type == "lora":
+            args["lora_rank"] = cfg["lora_r"]
+            args["lora_alpha"] = cfg["lora_alpha"]
         # F011 follow-on: pass through optional LF-native config keys when present.
         # dataset_dir is required when using a custom (non-default) dataset_info.json.
         for opt in ("dataset_dir", "template", "cutoff_len", "logging_steps",
