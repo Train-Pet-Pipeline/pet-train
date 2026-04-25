@@ -64,7 +64,7 @@ class PANNsAudioInference:
         self._device = device
 
     @classmethod
-    def from_params(cls, params: dict[str, Any]) -> "PANNsAudioInference":
+    def from_params(cls, params: dict[str, Any]) -> PANNsAudioInference:
         """Build from params.yaml audio sub-dict.
 
         Reads optional ``checkpoint_path`` (panns_inference downloads default
