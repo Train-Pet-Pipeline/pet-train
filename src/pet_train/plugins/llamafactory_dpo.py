@@ -34,23 +34,40 @@ class LlamaFactoryDPOTrainer:
 
     @staticmethod
     def _hydra_to_lf_args(cfg: dict[str, Any]) -> dict[str, Any]:
-        """Map hydra recipe config keys to LLaMA-Factory run_dpo kwargs."""
-        return {
+        """Map hydra recipe config keys to LLaMA-Factory run_exp args dict."""
+        # F013 fix companion: honor cfg["finetuning_type"] (default lora).
+        ft_type = cfg.get("finetuning_type", "lora")
+        args: dict[str, Any] = {
             "model_name_or_path": cfg["base_model"],
             "dataset": cfg["dataset"],
-            "lora_rank": cfg["lora_r"],
-            "lora_alpha": cfg["lora_alpha"],
             "learning_rate": cfg["lr"],
             "per_device_train_batch_size": cfg["batch_size"],
             "gradient_accumulation_steps": cfg["grad_accum"],
             "max_steps": cfg["max_steps"],
             "output_dir": cfg["output_dir"],
-            "finetuning_type": "lora",
+            "finetuning_type": ft_type,
             "stage": "dpo",
             "pref_beta": cfg["pref_beta"],
             "pref_loss": cfg.get("pref_loss", "sigmoid"),
             "pref_ftx": cfg.get("pref_ftx", 0.0),
+            "do_train": True,
         }
+        if ft_type == "lora":
+            args["lora_rank"] = cfg["lora_r"]
+            args["lora_alpha"] = cfg["lora_alpha"]
+        # F011 follow-on: pass through optional LF-native config keys when present
+        for opt in ("dataset_dir", "template", "cutoff_len", "logging_steps",
+                    "save_steps", "lr_scheduler_type", "warmup_ratio",
+                    "num_train_epochs", "preprocessing_num_workers",
+                    "trust_remote_code", "bf16", "fp16", "report_to"):
+            if opt in cfg:
+                args[opt] = cfg[opt]
+        precision = cfg.get("precision")
+        if precision == "bf16":
+            args["bf16"] = True
+        elif precision == "fp16":
+            args["fp16"] = True
+        return args
 
     def run(self, input_card: ModelCard | None, recipe: Any) -> ModelCard:
         """Execute DPO training and return a populated ModelCard.
@@ -73,9 +90,10 @@ class LlamaFactoryDPOTrainer:
             if dp.suffix == ".jsonl":
                 validate_dpo_jsonl(dp)
 
-        from llamafactory.train.dpo.workflow import run_dpo
+        # F011 fix: use run_exp(args=dict) public entry, not run_dpo(**kwargs) low-level
+        from llamafactory.train.tuner import run_exp
 
-        run_dpo(**self._lf_args)
+        run_exp(args=self._lf_args)
         self._adapter_uri = f"file://{Path(self._output_dir).resolve()}/adapter"
         return self._build_model_card(input_card, recipe)
 
