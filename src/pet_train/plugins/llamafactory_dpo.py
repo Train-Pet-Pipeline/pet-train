@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -188,13 +187,6 @@ class LlamaFactoryDPOTrainer:
 
     @staticmethod
     def _collect_git_shas() -> dict[str, str]:
-        """Return dict of repo->SHA for provenance; returns empty dict on failure."""
-        try:
-            sha = subprocess.check_output(
-                ["git", "rev-parse", "HEAD"],
-                stderr=subprocess.DEVNULL,
-                text=True,
-            ).strip()
-            return {"pet_train": sha}
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            return {}
+        """Return ``{<sibling-repo-name>: <HEAD sha>}`` for provenance (F024 fix)."""
+        from pet_train.lineage import collect_git_shas
+        return collect_git_shas()
