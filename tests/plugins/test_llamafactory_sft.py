@@ -91,3 +91,59 @@ def test_collect_train_metrics_falls_back_to_train_results(tmp_path, sample_cfg:
     trainer = LlamaFactorySFTTrainer(**sample_cfg)
     metrics = trainer._collect_train_metrics()
     assert metrics == {"train_loss": 0.42}
+
+
+def test_collect_train_metrics_no_rewards_for_sft(tmp_path, sample_cfg: dict) -> None:
+    """F023: SFT trainer_state has no rewards/* — _collect_train_metrics returns aggregate-only."""
+    import json
+    sample_cfg["output_dir"] = str(tmp_path)
+    (tmp_path / "all_results.json").write_text(json.dumps({
+        "epoch": 0.53, "train_loss": 0.518,
+    }))
+    (tmp_path / "trainer_state.json").write_text(json.dumps({
+        "log_history": [
+            {"step": 1, "loss": 0.59, "epoch": 0.07},  # SFT step, no rewards/*
+            {"step": 8, "loss": 0.37, "epoch": 0.53},
+            {"step": 8, "train_loss": 0.518},
+        ],
+    }))
+    trainer = LlamaFactorySFTTrainer(**sample_cfg)
+    metrics = trainer._collect_train_metrics()
+    assert metrics["train_loss"] == 0.518
+    assert metrics["epoch"] == 0.53
+    # No rewards/* keys (SFT log_history has none)
+    assert all(not k.startswith("rewards/") for k in metrics)
+
+
+def test_adapter_uri_points_to_output_dir(tmp_path, sample_cfg, monkeypatch) -> None:
+    """F025 fix: checkpoint_uri must equal output_dir, not output_dir/adapter."""
+    import sys
+    import types
+    from pathlib import Path
+    from urllib.parse import urlparse
+
+    sample_cfg["output_dir"] = str(tmp_path)
+    # LF writes adapter_model.safetensors here directly; no 'adapter' subdir
+    (tmp_path / "adapter_model.safetensors").write_bytes(b"fake")
+    (tmp_path / "all_results.json").write_text('{"train_loss": 0.5}')
+
+    fake_mod = types.ModuleType("llamafactory.train.tuner")
+    fake_mod.run_exp = lambda args=None: None
+    sys.modules.setdefault("llamafactory", types.ModuleType("llamafactory"))
+    sys.modules.setdefault("llamafactory.train", types.ModuleType("llamafactory.train"))
+    sys.modules["llamafactory.train.tuner"] = fake_mod
+
+    trainer = LlamaFactorySFTTrainer(**sample_cfg)
+    monkeypatch.setattr(trainer, "_collect_git_shas", lambda: {})
+    sample_cfg.pop("data_path", None)
+    trainer._cfg.pop("data_path", None)
+
+    class FakeRecipe:
+        recipe_id = "test"
+        schema_version = "1.0"
+
+    card = trainer.run(input_card=None, recipe=FakeRecipe())
+    expected_uri = f"file://{tmp_path.resolve()}"
+    assert card.checkpoint_uri == expected_uri
+    real_path = urlparse(card.checkpoint_uri).path
+    assert (Path(real_path) / "adapter_model.safetensors").exists()
