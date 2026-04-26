@@ -100,3 +100,17 @@ class TestAudioInference:
         fake_probs = torch.zeros(527)
         scores = model._aggregate_scores(fake_probs)
         assert set(scores.keys()) == set(CLASSES)
+
+    def test_pretrained_arch_drift_logs_warning(self, tmp_path, caplog):
+        """F008 retro: when checkpoint shape doesn't match the local arch,
+        load_state_dict(strict=False) silently drops keys. Make sure we at
+        least log a warning so users know weights were not fully loaded."""
+        import logging
+
+        bogus = {"features.0.weight": torch.zeros(8, 8, 3, 3)}  # wrong everything
+        ckpt_path = tmp_path / "bogus.pth"
+        torch.save({"model": bogus}, ckpt_path)
+        with caplog.at_level(logging.WARNING, logger="pet_train.audio.inference"):
+            AudioInference(pretrained_path=str(ckpt_path))
+        warns = [r for r in caplog.records if "partially loaded" in r.message]
+        assert warns, "expected drift warning, got none"
