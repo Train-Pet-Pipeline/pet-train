@@ -100,27 +100,53 @@ class LlamaFactoryDPOTrainer:
         return self._build_model_card(input_card, recipe)
 
     def _collect_train_metrics(self) -> dict[str, float]:
-        """Read LF's all_results.json and return float metrics (F022 fix companion).
+        """Read LF's all_results.json + trainer_state.json log_history (F022 + F023).
 
-        DPO emits ``rewards/margins``, ``rewards/chosen``, ``rewards/rejected``,
-        and the standard ``train_loss`` / ``train_runtime`` keys. All scalars in
-        ``all_results.json`` flow into ``ModelCard.metrics`` so eval gates and
-        ClearML downstream see the same numbers LF wrote to disk.
+        F022: ``all_results.json`` carries aggregate train_loss / train_runtime /
+        epoch / total_flos / samples_per_second / steps_per_second.
+
+        F023: DPO's ``rewards/{margins,chosen,rejected,accuracies}`` and
+        ``logps/{chosen,rejected}`` / ``logits/{chosen,rejected}`` only appear in
+        per-step entries inside ``trainer_state.json::log_history``. We pull the
+        last entry whose keys include any of those families so card.metrics
+        carries the FINAL training-step view of those signals (the most useful
+        single point for downstream eval gates / ClearML reporting).
         """
         out_dir = Path(self._output_dir)
+        metrics: dict[str, float] = {}
         for fname in ("all_results.json", "train_results.json"):
-            metrics_path = out_dir / fname
-            if not metrics_path.exists():
+            p = out_dir / fname
+            if not p.exists():
                 continue
             try:
-                payload = json.loads(metrics_path.read_text())
+                payload = json.loads(p.read_text())
             except (OSError, json.JSONDecodeError):
-                return {}
-            return {
+                break
+            metrics.update({
                 k: float(v) for k, v in payload.items()
                 if isinstance(v, (int, float)) and not isinstance(v, bool)
-            }
-        return {}
+            })
+            break
+        state_path = out_dir / "trainer_state.json"
+        if state_path.exists():
+            try:
+                state = json.loads(state_path.read_text())
+            except (OSError, json.JSONDecodeError):
+                state = {}
+            for entry in reversed(state.get("log_history", []) or []):
+                step_metrics = {
+                    k: float(v) for k, v in entry.items()
+                    if isinstance(v, (int, float)) and not isinstance(v, bool)
+                    and (
+                        k.startswith("rewards/")
+                        or k.startswith("logps/")
+                        or k.startswith("logits/")
+                    )
+                }
+                if step_metrics:
+                    metrics.update(step_metrics)
+                    break
+        return metrics
 
     def _build_model_card(self, input_card: ModelCard | None, recipe: Any) -> ModelCard:
         """Construct a ModelCard from training config and recipe metadata."""

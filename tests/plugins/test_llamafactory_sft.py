@@ -91,3 +91,25 @@ def test_collect_train_metrics_falls_back_to_train_results(tmp_path, sample_cfg:
     trainer = LlamaFactorySFTTrainer(**sample_cfg)
     metrics = trainer._collect_train_metrics()
     assert metrics == {"train_loss": 0.42}
+
+
+def test_collect_train_metrics_no_rewards_for_sft(tmp_path, sample_cfg: dict) -> None:
+    """F023: SFT trainer_state has no rewards/* — _collect_train_metrics returns aggregate-only."""
+    import json
+    sample_cfg["output_dir"] = str(tmp_path)
+    (tmp_path / "all_results.json").write_text(json.dumps({
+        "epoch": 0.53, "train_loss": 0.518,
+    }))
+    (tmp_path / "trainer_state.json").write_text(json.dumps({
+        "log_history": [
+            {"step": 1, "loss": 0.59, "epoch": 0.07},  # SFT step, no rewards/*
+            {"step": 8, "loss": 0.37, "epoch": 0.53},
+            {"step": 8, "train_loss": 0.518},
+        ],
+    }))
+    trainer = LlamaFactorySFTTrainer(**sample_cfg)
+    metrics = trainer._collect_train_metrics()
+    assert metrics["train_loss"] == 0.518
+    assert metrics["epoch"] == 0.53
+    # No rewards/* keys (SFT log_history has none)
+    assert all(not k.startswith("rewards/") for k in metrics)

@@ -92,3 +92,39 @@ def test_collect_train_metrics_no_results_file(tmp_path, sample_cfg: dict) -> No
     sample_cfg["output_dir"] = str(tmp_path)
     trainer = LlamaFactoryDPOTrainer(**sample_cfg)
     assert trainer._collect_train_metrics() == {}
+
+
+def test_collect_train_metrics_pulls_rewards_from_trainer_state(tmp_path, sample_cfg: dict) -> None:
+    """F023 fix: DPO rewards/* are in trainer_state.json log_history, not all_results.json."""
+    import json
+    sample_cfg["output_dir"] = str(tmp_path)
+    (tmp_path / "all_results.json").write_text(json.dumps({
+        "epoch": 0.67,
+        "train_loss": 0.6269,
+        "train_runtime": 12.62,
+    }))
+    (tmp_path / "trainer_state.json").write_text(json.dumps({
+        "log_history": [
+            {"step": 1, "loss": 0.69, "rewards/chosen": 0.0, "rewards/rejected": 0.0,
+             "rewards/margins": 0.0, "rewards/accuracies": 0.0,
+             "logps/chosen": -222.8, "logps/rejected": -242.5,
+             "logits/chosen": 1.41, "logits/rejected": 1.41},
+            {"step": 5, "loss": 0.54, "rewards/chosen": 0.135, "rewards/rejected": -0.366,
+             "rewards/margins": 0.502, "rewards/accuracies": 0.75,
+             "logps/chosen": -225.7, "logps/rejected": -258.2,
+             "logits/chosen": 1.46, "logits/rejected": 1.38},
+            {"step": 5, "epoch": 0.67, "train_loss": 0.6269},  # train summary, no rewards/*
+        ],
+    }))
+    trainer = LlamaFactoryDPOTrainer(**sample_cfg)
+    metrics = trainer._collect_train_metrics()
+    # F022: aggregate kept
+    assert metrics["train_loss"] == 0.6269
+    assert metrics["epoch"] == 0.67
+    # F023: last per-step rewards/logps/logits captured (from step 5, not step 1)
+    assert metrics["rewards/margins"] == 0.502
+    assert metrics["rewards/chosen"] == 0.135
+    assert metrics["rewards/rejected"] == -0.366
+    assert metrics["rewards/accuracies"] == 0.75
+    assert metrics["logps/chosen"] == -225.7
+    assert metrics["logits/chosen"] == 1.46
