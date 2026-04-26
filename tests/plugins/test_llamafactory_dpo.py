@@ -66,3 +66,29 @@ def test_registry_build_produces_trainer(sample_cfg: dict) -> None:
     assert isinstance(trainer, LlamaFactoryDPOTrainer)
     assert trainer._lf_args["stage"] == "dpo"
     assert trainer._lf_args["pref_beta"] == 0.1
+
+
+def test_collect_train_metrics_reads_all_results_json(tmp_path, sample_cfg: dict) -> None:
+    """F022 fix companion: DPO wrapper _collect_train_metrics must parse all_results.json."""
+    import json
+    sample_cfg["output_dir"] = str(tmp_path)
+    (tmp_path / "all_results.json").write_text(json.dumps({
+        "epoch": 0.5,
+        "train_loss": 0.62,
+        "rewards/margins": 0.34,
+        "rewards/chosen": 0.18,
+        "rewards/rejected": -0.16,
+    }))
+    trainer = LlamaFactoryDPOTrainer(**sample_cfg)
+    metrics = trainer._collect_train_metrics()
+    assert metrics["train_loss"] == 0.62
+    assert metrics["rewards/margins"] == 0.34
+    assert metrics["rewards/chosen"] == 0.18
+    assert metrics["rewards/rejected"] == -0.16
+
+
+def test_collect_train_metrics_no_results_file(tmp_path, sample_cfg: dict) -> None:
+    """F022 fix: missing results file → {}, no crash."""
+    sample_cfg["output_dir"] = str(tmp_path)
+    trainer = LlamaFactoryDPOTrainer(**sample_cfg)
+    assert trainer._collect_train_metrics() == {}
