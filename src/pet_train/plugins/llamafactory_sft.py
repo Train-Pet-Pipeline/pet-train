@@ -96,7 +96,11 @@ class LlamaFactorySFTTrainer:
         from llamafactory.train.tuner import run_exp
 
         run_exp(args=self._lf_args)
-        self._adapter_uri = f"file://{Path(self._output_dir).resolve()}/adapter"
+        # F025 fix: LF saves adapter_model.safetensors directly to output_dir
+        # (not output_dir/adapter). Previous code wrote a non-existent path so
+        # downstream eval (vlm_evaluator.run reads input_card.checkpoint_uri to
+        # locate weights) loaded base model only — silent finetune-disabled bug.
+        self._adapter_uri = f"file://{Path(self._output_dir).resolve()}"
         self._metrics = self._collect_train_metrics()
         return self._build_model_card(input_card, recipe)
 
