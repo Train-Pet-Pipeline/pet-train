@@ -49,10 +49,18 @@ def collect_git_shas() -> dict[str, str]:
         log.debug("collect_git_shas: file not under expected monorepo layout")
         return {}
 
-    siblings = [
-        p for p in root.iterdir()
-        if p.is_dir() and (p / ".git").exists()
-    ]
+    siblings: list[Path] = []
+    try:
+        for p in root.iterdir():
+            try:
+                if p.is_dir() and (p / ".git").exists():
+                    siblings.append(p)
+            except (PermissionError, OSError):
+                # Skip dirs we can't stat (CI sandbox /tmp/systemd-private-… etc.)
+                continue
+    except (PermissionError, OSError):
+        log.debug("collect_git_shas: cannot iterate root %s", root)
+        return {}
     if not siblings:
         log.debug("collect_git_shas: no sibling repos at %s", root)
         return {}
