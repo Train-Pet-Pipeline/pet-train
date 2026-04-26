@@ -31,6 +31,7 @@ class LlamaFactoryDPOTrainer:
         self._lf_args: dict[str, Any] = self._hydra_to_lf_args(self._cfg)
         self._output_dir: str = str(cfg["output_dir"])
         self._adapter_uri: str | None = None
+        self._metrics: dict[str, float] = {}
 
     @staticmethod
     def _hydra_to_lf_args(cfg: dict[str, Any]) -> dict[str, Any]:
@@ -95,7 +96,31 @@ class LlamaFactoryDPOTrainer:
 
         run_exp(args=self._lf_args)
         self._adapter_uri = f"file://{Path(self._output_dir).resolve()}/adapter"
+        self._metrics = self._collect_train_metrics()
         return self._build_model_card(input_card, recipe)
+
+    def _collect_train_metrics(self) -> dict[str, float]:
+        """Read LF's all_results.json and return float metrics (F022 fix companion).
+
+        DPO emits ``rewards/margins``, ``rewards/chosen``, ``rewards/rejected``,
+        and the standard ``train_loss`` / ``train_runtime`` keys. All scalars in
+        ``all_results.json`` flow into ``ModelCard.metrics`` so eval gates and
+        ClearML downstream see the same numbers LF wrote to disk.
+        """
+        out_dir = Path(self._output_dir)
+        for fname in ("all_results.json", "train_results.json"):
+            metrics_path = out_dir / fname
+            if not metrics_path.exists():
+                continue
+            try:
+                payload = json.loads(metrics_path.read_text())
+            except (OSError, json.JSONDecodeError):
+                return {}
+            return {
+                k: float(v) for k, v in payload.items()
+                if isinstance(v, (int, float)) and not isinstance(v, bool)
+            }
+        return {}
 
     def _build_model_card(self, input_card: ModelCard | None, recipe: Any) -> ModelCard:
         """Construct a ModelCard from training config and recipe metadata."""
@@ -117,7 +142,7 @@ class LlamaFactoryDPOTrainer:
             checkpoint_uri=self._adapter_uri or "",
             parent_models=parent_models,
             lineage_role="dpo_output",
-            metrics={},
+            metrics=dict(self._metrics),
             gate_status="pending",
             trained_at=datetime.now(UTC),
             trained_by=self._cfg.get("trained_by") or os.environ.get("USER", "ci"),
