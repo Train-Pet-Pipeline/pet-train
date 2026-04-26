@@ -25,8 +25,8 @@ jobs:
       - name: Install system deps
         run: sudo apt-get update && sudo apt-get install -y libsndfile1
 
-      - name: Install pet-schema (peer-dep, per compatibility_matrix 2026.09)
-        run: pip install 'pet-schema @ git+https://github.com/Train-Pet-Pipeline/pet-schema@v3.2.1'
+      - name: Install pet-schema (peer-dep, per compatibility_matrix 2026.11)
+        run: pip install 'pet-schema @ git+https://github.com/Train-Pet-Pipeline/pet-schema@v3.3.0'
 
       - name: Install pet-infra (peer-dep, per compatibility_matrix 2026.09)
         run: pip install 'pet-infra @ git+https://github.com/Train-Pet-Pipeline/pet-infra@v2.6.0'
@@ -44,8 +44,8 @@ jobs:
           import pet_infra
           from pet_schema.version import SCHEMA_VERSION
           schema_v = importlib.metadata.version('pet-schema')
-          assert schema_v == '3.2.1', f'unexpected pet_schema version {schema_v}'
-          assert SCHEMA_VERSION == '3.2.1', f'SCHEMA_VERSION drift: {SCHEMA_VERSION}'
+          assert schema_v == '3.3.0', f'unexpected pet_schema version {schema_v}'
+          assert SCHEMA_VERSION == '3.3.0', f'SCHEMA_VERSION drift: {SCHEMA_VERSION}'
           assert pet_infra.__version__.startswith('2.6.'), f'unexpected pet_infra version {pet_infra.__version__}'
           print('peer-dep versions OK: pet_schema', schema_v, ', pet_infra', pet_infra.__version__)
           "
