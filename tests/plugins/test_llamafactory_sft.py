@@ -54,3 +54,40 @@ def test_registry_build_produces_trainer(sample_cfg: dict) -> None:
     trainer = TRAINERS.build({"type": "llamafactory_sft", **sample_cfg})
     assert isinstance(trainer, LlamaFactorySFTTrainer)
     assert trainer._lf_args["lora_rank"] == 16
+
+
+def test_collect_train_metrics_reads_all_results_json(tmp_path, sample_cfg: dict) -> None:
+    """F022 fix: _collect_train_metrics() must parse LF's all_results.json into card.metrics."""
+    import json
+    sample_cfg["output_dir"] = str(tmp_path)
+    (tmp_path / "all_results.json").write_text(json.dumps({
+        "epoch": 0.53,
+        "total_flos": 730252.0,
+        "train_loss": 0.5181,
+        "train_runtime": 8.2567,
+        "train_samples_per_second": 3.876,
+    }))
+    trainer = LlamaFactorySFTTrainer(**sample_cfg)
+    metrics = trainer._collect_train_metrics()
+    assert metrics["train_loss"] == 0.5181
+    assert metrics["epoch"] == 0.53
+    assert metrics["train_runtime"] == 8.2567
+    # bool / non-numeric keys filtered
+    assert all(isinstance(v, float) for v in metrics.values())
+
+
+def test_collect_train_metrics_no_results_file(tmp_path, sample_cfg: dict) -> None:
+    """F022 fix: missing all_results.json must return {} (not crash)."""
+    sample_cfg["output_dir"] = str(tmp_path)
+    trainer = LlamaFactorySFTTrainer(**sample_cfg)
+    assert trainer._collect_train_metrics() == {}
+
+
+def test_collect_train_metrics_falls_back_to_train_results(tmp_path, sample_cfg: dict) -> None:
+    """F022 fix: if all_results.json missing but train_results.json present, use it."""
+    import json
+    sample_cfg["output_dir"] = str(tmp_path)
+    (tmp_path / "train_results.json").write_text(json.dumps({"train_loss": 0.42}))
+    trainer = LlamaFactorySFTTrainer(**sample_cfg)
+    metrics = trainer._collect_train_metrics()
+    assert metrics == {"train_loss": 0.42}
