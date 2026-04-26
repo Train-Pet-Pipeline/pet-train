@@ -116,7 +116,17 @@ class AudioInference:
                 pretrained_path, map_location="cpu", weights_only=True
             )
             state_dict = checkpoint.get("model", checkpoint)
-            model.load_state_dict(state_dict, strict=False)
+            result = model.load_state_dict(state_dict, strict=False)
+            # F008 retro: log any architectural drift loudly so future maintainers
+            # know if a checkpoint silently dropped layers (silent drop is what
+            # let the F008 PANNs MobileNetV2 incompat slip past CI).
+            if result.missing_keys or result.unexpected_keys:
+                logger.warning(
+                    "Pretrained weights partially loaded — missing=%d unexpected=%d "
+                    "(likely architecture drift; consider PANNsAudioInference plugin)",
+                    len(result.missing_keys),
+                    len(result.unexpected_keys),
+                )
             logger.info("Loaded pretrained weights from %s", pretrained_path)
         return model
 
