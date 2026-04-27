@@ -39,8 +39,8 @@ pet-annotation → [pet-train] → pet-eval → pet-quantize → pet-ota
 
 | Dependency | Mode | Locked version |
 |---|---|---|
-| pet-schema | β peer-dep (not in pyproject.dependencies) | v3.2.1 (compatibility_matrix 2026.09) |
-| pet-infra | β peer-dep (not in pyproject.dependencies) | v2.6.0 (compatibility_matrix 2026.09) |
+| pet-schema | β peer-dep (not in pyproject.dependencies) | v3.3.0 (compatibility_matrix 2026.11) |
+| pet-infra | β peer-dep (not in pyproject.dependencies) | v2.9.5 (compatibility_matrix 2026.11) |
 | pet-annotation | runtime data | exported JSONL files (paths from params.yaml) |
 
 ### Input types
@@ -59,8 +59,8 @@ validate on the producer side.
 
 ### Outputs
 
-- `ModelCard` (pet-schema) — returned from `.run()`, consumed by pet-eval and pet-quantize
-- Trained checkpoint directory — LLaMA-Factory LoRA adapter at `output_dir/adapter`
+- `ModelCard` (pet-schema) — returned from `.run()`, consumed by pet-eval and pet-quantize; `metrics` is now populated from `all_results.json` + `trainer_state.json` (F022/F023 fix)
+- Trained checkpoint directory — LLaMA-Factory LoRA adapter at `output_dir` (not `output_dir/adapter`; see F025)
 - PANNs audio weights — `audio/inference.py:AudioInference.get_weights_path()` handed to pet-quantize for INT8 conversion
 
 ### Downstream consumers
@@ -77,7 +77,7 @@ validate on the producer side.
 
 ```
 src/pet_train/
-├── __init__.py                    ← __version__ = "2.0.2"
+├── __init__.py                    ← __version__ = "2.2.5"
 ├── plugins/
 │   ├── __init__.py
 │   ├── _register.py               ← dual peer-dep guard (pet-schema first, then pet-infra)
@@ -90,6 +90,8 @@ src/pet_train/
 │   ├── arch.py                    ← MobileNetV2AudioSet (num_classes=527 PANNs const)
 │   ├── transforms.py              ← AudioTransform.from_params() (log-mel + SpecAugment)
 │   └── inference.py               ← AudioInference (PANNs zero-shot, pet-eval imports this)
+├── lineage/
+│   └── collect_git_shas.py        ← collect_git_shas() walks sibling repos with hyphenated keys (F024)
 vendor/
 └── LLaMA-Factory/                 ← plain directory copy v0.9.4 (Apache 2.0, see NOTICE)
 .github/workflows/
@@ -152,6 +154,15 @@ registered with `pet_infra.registry.TRAINERS` via `@TRAINERS.register_module`. E
 a hydra-style config dict to LLaMA-Factory kwargs (`_hydra_to_lf_args`), validates input data
 (F11), then delegates to `run_sft` / `run_dpo`. After training it builds and returns a
 `ModelCard` with SHA-pinned config (`hydra_config_sha`), git provenance, and adapter URI.
+
+**F022/F023 fix:** Both wrappers now parse `all_results.json` and `trainer_state.json` from
+the output directory to populate `card.metrics`. Previously `card.metrics` was always `{}`.
+DPO-specific `rewards/{margins,chosen,rejected}` are extracted from the last per-step entry in
+`trainer_state.json::log_history` (not from `all_results.json`, which does not contain them).
+
+**F025 fix:** `card.checkpoint_uri = output_dir` (no `/adapter` suffix). The prior `/adapter`
+suffix pointed to a non-existent path since LLaMA-Factory writes the adapter directly into
+`output_dir`.
 
 **Why LLaMA-Factory:** It is the SFT/DPO fine-tuning standard for open LLMs. Vendoring
 avoids PyPI version drift and keeps the API surface stable — LLaMA-Factory's public API
@@ -297,11 +308,11 @@ The `_register.py` dual guard surfaces clear `RuntimeError` if either is absent.
 ### CI 5-step install sequence (ci.yml)
 
 ```
-1. pip install 'pet-schema @ git+https://...@v3.2.1'
-2. pip install 'pet-infra @ git+https://...@v2.6.0'
+1. pip install 'pet-schema @ git+https://...@v3.3.0'
+2. pip install 'pet-infra @ git+https://...@v2.9.5'
 3. pip install -e . --no-deps          # pet-train editable, no peer-dep re-resolution
 4. pip install -e ".[dev]"             # dev extras (pytest, ruff, mypy, soundfile)
-5. python -c "assert pet_schema.__version__ == '3.2.1' ..."  # version assert
+5. python -c "assert pet_schema.__version__ == '3.3.0' ..."  # version assert
 ```
 
 This sequence is mirrored in `peer-dep-smoke.yml`. The `--no-deps` flag in step 3 prevents
@@ -324,8 +335,8 @@ in `NOTICE`. `make setup` runs `cd vendor/LLaMA-Factory && pip install -e ".[met
 ```bash
 # Prerequisites: conda env pet-pipeline, peer-deps installed
 conda activate pet-pipeline
-pip install 'pet-schema @ git+https://github.com/Train-Pet-Pipeline/pet-schema@v3.2.1'
-pip install 'pet-infra @ git+https://github.com/Train-Pet-Pipeline/pet-infra@v2.6.0'
+pip install 'pet-schema @ git+https://github.com/Train-Pet-Pipeline/pet-schema@v3.3.0'
+pip install 'pet-infra @ git+https://github.com/Train-Pet-Pipeline/pet-infra@v2.9.5'
 
 make setup   # pip install -e ".[dev]" + vendor/LLaMA-Factory metrics extras
 make lint    # ruff check src/ tests/ && mypy src/
@@ -449,3 +460,21 @@ torch becomes a universal baseline that all CI runners have.
    condition), `MobileNetV2AudioSet.from_params` should accept an optional `num_classes`
    kwarg that overrides the AudioSet 527 default. The override should emit a warning log
    when used, since PANNs pretrained weights will not be loadable with a different value.
+
+---
+
+### Recent (2026-04-27)
+
+F017-F027 续租验证周期的 pet-train 相关修复：
+
+**F022** (`plugins/llamafactory_sft.py` + `llamafactory_dpo.py`) — LF wrappers 现在在 `run()` 返回前解析输出目录中的 `all_results.json` 和 `trainer_state.json`，并将关键指标（`train_loss`, `eval_loss`, `epoch`, 等）填入 `card.metrics`。修复前 `card.metrics` 始终为 `{}`。
+- 参见：`pet-infra/docs/ecosystem-validation/2026-04-25-findings/F022-llamafactory-wrappers-not-capturing-train-metrics.md`
+
+**F023** (`plugins/llamafactory_dpo.py`) — DPO wrapper 的 `rewards/{margins,chosen,rejected}` 指标从 `trainer_state.json::log_history` 最后一个 per-step 条目中提取（`all_results.json` 不包含 DPO rewards）。修复后 DPO cards 正确携带 reward metrics。
+- 参见：`pet-infra/docs/ecosystem-validation/2026-04-25-findings/F023-dpo-rewards-not-in-all-results-need-trainer-state.md`
+
+**F024** (`lineage/collect_git_shas.py` 新文件) — 新增 `pet_train.lineage.collect_git_shas()` 函数，使用 hyphenated key 命名约定（如 `pet-train`，非 `pet_train`）walk 所有 sibling 仓库收集 git SHA。与 `pet_infra.replay._current_git_shas` 共享 key 约定，解决了 underscore/hyphen 不匹配导致的 drift detection 失效。
+- 参见：`pet-infra/docs/ecosystem-validation/2026-04-25-findings/F024-git-shas-key-mismatch-and-parents-off-by-one.md`
+
+**F025** (`plugins/llamafactory_sft.py` + `llamafactory_dpo.py`) — `card.checkpoint_uri = output_dir`，去掉了原来错误的 `/adapter` 后缀。LLaMA-Factory 将 LoRA adapter 直接写入 `output_dir`，`output_dir/adapter` 子目录不存在。§4.1 中已相应更新。
+- 参见：`pet-infra/docs/ecosystem-validation/2026-04-25-findings/F025-checkpoint-uri-points-to-nonexistent-adapter-subdir.md`
